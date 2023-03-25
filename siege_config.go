@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	"reflect"
 	"strings"
@@ -140,7 +139,7 @@ func (c *SiegeConfig) String() string {
 				}
 			}
 		default:
-			log.Printf("Failed to export Siege config: got a '%s' when trying to export '%s'", fieldType.Type.Name(), name)
+			fmt.Printf("Failed to export Siege config: got a '%s' when trying to export '%s'", fieldType.Type.Name(), name)
 		}
 	}
 

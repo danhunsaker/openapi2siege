@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path"
+	"strings"
 
 	"github.com/pb33f/libopenapi"
 	"github.com/pb33f/libopenapi/utils"
@@ -127,7 +129,7 @@ func main() {
 			if len(errs) > 0 {
 				for _, err = range errs {
 					if err != nil {
-						log.Printf("Could not load v2 spec in %s\n%v\n", specPath, err)
+						fmt.Printf("Could not load v2 spec in %s\n%v\n", specPath, err)
 					}
 				}
 
@@ -143,7 +145,7 @@ func main() {
 			if len(errs) > 0 {
 				for _, err = range errs {
 					if err != nil {
-						log.Printf("Could not load v3 spec in %s\n%v\n", specPath, err)
+						fmt.Printf("Could not load v3 spec in %s\n%v\n", specPath, err)
 					}
 				}
 
@@ -158,12 +160,12 @@ func main() {
 			return fmt.Errorf("Could not load spec in %s\nUnknown Spec Type %s\n", specPath, specDoc.GetSpecInfo().SpecType)
 		}
 
-		urlFile := c.Path("siege.urls")
-		if err = os.WriteFile(urlFile, []byte(urls.String()), os.ModePerm); err != nil {
-			return err
-		}
+		conf.GetMethod = "GET"
 
+		urlFile := c.Path("siege.urls")
+		configFile := c.Path("siege.config")
 		cookieFile := c.Path("siege.cookies")
+
 		cookies, err := urls.CookieJar(cookieFile)
 		if err != nil {
 			return err
@@ -172,12 +174,38 @@ func main() {
 			return err
 		}
 
-		conf.GetMethod = "GET"
-
-		configFile := c.Path("siege.config")
-		if err = os.WriteFile(configFile, []byte(conf.String()), os.ModePerm); err != nil {
-			return err
+		multipleTypes := false
+		if len(urls.MediaTypes()) > 1 {
+			multipleTypes = true
 		}
+
+		for _, mediaType := range urls.MediaTypes() {
+			myUrlFile := urlFile
+			myConfigFile := configFile
+
+			if multipleTypes {
+				splitType := strings.Split(mediaType, "/")
+				furtherSplitType := strings.Split(splitType[len(splitType)-1], "+")
+				prefix := furtherSplitType[len(furtherSplitType)-1]
+
+				myUrlFile = prefixFilename(prefix, myUrlFile)
+				myConfigFile = prefixFilename(prefix, myConfigFile)
+			}
+
+			if err = os.WriteFile(myUrlFile, []byte(urls.StringByMediaType(mediaType)), os.ModePerm); err != nil {
+				return err
+			}
+
+			conf.UrlFile = myUrlFile
+
+			if err = os.WriteFile(myConfigFile, []byte(conf.String()), os.ModePerm); err != nil {
+				return err
+			}
+
+			fmt.Printf("\nConversion complete! To use, run\n\tsiege -R %s -T '%s'\n", myConfigFile, mediaType)
+		}
+
+		fmt.Println("")
 
 		return nil
 	}
@@ -187,4 +215,12 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+func prefixFilename(prefix, filename string) string {
+	dir, file := path.Split(filename)
+
+	prefixedFile := fmt.Sprintf("%s.%s", prefix, file)
+
+	return path.Join(dir, prefixedFile)
 }

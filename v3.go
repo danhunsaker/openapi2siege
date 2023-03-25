@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	"net/url"
 	"sort"
@@ -76,7 +75,7 @@ func handleV3Spec(c *cli.Context, spec *libopenapi.DocumentModel[v3.Document]) (
 		}
 
 		if pathData.Trace != nil && !*pathData.Trace.Deprecated {
-			log.Printf("TRACE operations are unsupported by Siege; your tests will be incomplete\n\tSkipping TRACE for %s\n", rawPath)
+			fmt.Printf("TRACE operations are unsupported by Siege; your tests will be incomplete\n\tSkipping TRACE for %s\n", rawPath)
 		}
 
 		if pathData.Head != nil && !*pathData.Head.Deprecated {
@@ -157,10 +156,10 @@ func handleV3Spec(c *cli.Context, spec *libopenapi.DocumentModel[v3.Document]) (
 				case "bearer":
 					if creds != "command" {
 						conf.Headers.Add("Authorization", fmt.Sprintf("Bearer %s", creds))
-						log.Println("The HTTP auth scheme `bearer` is supported on a best-effort basis.\n\tSiege does NOT actively support bearer tokens; expiration handling is up to you.")
+						fmt.Println("The HTTP auth scheme `bearer` is supported on a best-effort basis.\n\tSiege does NOT actively support bearer tokens; expiration handling is up to you.")
 					} else {
 						conf.Headers.Add("Authorization", "Bearer ${OA2S_TOKEN}")
-						log.Println("The HTTP auth scheme `bearer` is supported on a best-effort basis.\n\tSiege does NOT actively support bearer tokens; you need to manually set your current token in the OA2S_TOKEN environment variable.")
+						fmt.Println("The HTTP auth scheme `bearer` is supported on a best-effort basis.\n\tSiege does NOT actively support bearer tokens; you need to manually set your current token in the OA2S_TOKEN environment variable.")
 					}
 				default:
 					return nil, nil, fmt.Errorf("The HTTP auth scheme %s (used in %s) is not currently supported.\n\tContact us to get it added!\n", scheme.Scheme, name)
@@ -218,10 +217,11 @@ func getV3RequestNoPayload(c *cli.Context, method, rawPath string, baseUrl *url.
 	pathUrl.RawQuery = query.Encode()
 
 	urls = append(urls, urlData{
-		Method:  strings.ToUpper(method),
-		URL:     *pathUrl,
-		Payload: "",
-		Cookies: cookies,
+		URL:       *pathUrl,
+		Method:    strings.ToUpper(method),
+		MediaType: "",
+		Payload:   "",
+		Cookies:   cookies,
 	})
 
 	return urls, nil
@@ -257,20 +257,21 @@ func getV3RequestWithPayload(c *cli.Context, method, rawPath string, baseUrl *ur
 
 	pathUrl.RawQuery = query.Encode()
 
-	payloads := make([]string, 0)
+	requests := make([]requestData, 0)
 	if methodData.RequestBody != nil {
-		payloads, err = getV3PathPayloads(c, method, rawPath, *methodData.RequestBody, methodConfig)
+		requests, err = getV3PathPayloads(c, method, rawPath, *methodData.RequestBody, methodConfig)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	for _, payload := range payloads {
+	for _, request := range requests {
 		urls = append(urls, urlData{
-			Method:  strings.ToUpper(method),
-			URL:     *pathUrl,
-			Payload: payload,
-			Cookies: cookies,
+			URL:       *pathUrl,
+			Method:    strings.ToUpper(method),
+			MediaType: request.MediaType,
+			Payload:   request.Payload,
+			Cookies:   cookies,
 		})
 	}
 
@@ -317,7 +318,7 @@ func getV3PathParams(c *cli.Context, method, rawPath string, params []*v3.Parame
 	query := make(url.Values)
 	cookies := make([]*http.Cookie, 0)
 
-	// log.Printf("Processing path: %s %s - %v - %v\n", method, rawPath, params, config.Params)
+	// fmt.Printf("Processing path: %s %s - %v - %v\n", method, rawPath, params, config.Params)
 
 	for _, param := range params {
 		var paramValue interface{}
@@ -350,7 +351,7 @@ func getV3PathParams(c *cli.Context, method, rawPath string, params []*v3.Parame
 			case "query":
 				query.Add(param.Name, interfaceToString(paramValue))
 			case "header":
-				log.Printf("Per-request headers are unsupported by Siege; your tests may not work as expected\n\tSkipping %s for %s\n", param.Name, rawPath)
+				fmt.Printf("Per-request headers are unsupported by Siege; your tests may not work as expected\n\tSkipping %s for %s\n", param.Name, rawPath)
 			case "cookie":
 				cookies = append(cookies, &http.Cookie{
 					Name:  param.Name,
@@ -363,11 +364,11 @@ func getV3PathParams(c *cli.Context, method, rawPath string, params []*v3.Parame
 	return path, query, cookies, nil
 }
 
-func getV3PathPayloads(c *cli.Context, method, rawPath string, body v3.RequestBody, config PathMethodConfig) ([]string, error) {
-	payloads := make([]string, 0)
+func getV3PathPayloads(c *cli.Context, method, rawPath string, body v3.RequestBody, config PathMethodConfig) ([]requestData, error) {
+	payloads := make([]requestData, 0)
 	var err error
 
-	// log.Printf("Processing path: %s %s - %v - %v\n", method, rawPath, body.Content, config.Payloads)
+	// fmt.Printf("Processing path: %s %s - %v - %v\n", method, rawPath, body.Content, config.Payloads)
 
 	for mediatype, details := range body.Content {
 		payload, exists := config.Payloads[mediatype]
@@ -391,7 +392,7 @@ func getV3PathPayloads(c *cli.Context, method, rawPath string, body v3.RequestBo
 					return nil, err
 				}
 
-				payloads = append(payloads, examplePayload)
+				payloads = append(payloads, requestData{MediaType: mediatype, Payload: examplePayload})
 
 				addedPayloads = true
 			}
@@ -414,7 +415,7 @@ func getV3PathPayloads(c *cli.Context, method, rawPath string, body v3.RequestBo
 		}
 
 		if payload != "" {
-			payloads = append(payloads, payload)
+			payloads = append(payloads, requestData{MediaType: mediatype, Payload: payload})
 		}
 
 		if body.Required && len(payloads) < 1 {
@@ -423,10 +424,10 @@ func getV3PathPayloads(c *cli.Context, method, rawPath string, body v3.RequestBo
 	}
 
 	if len(payloads) < 1 {
-		payloads = append(payloads, "\"\"")
+		payloads = append(payloads, requestData{MediaType: "", Payload: "\"\""})
 	}
 
-	// log.Printf("inserting payload(s) for: %s %s: %v\n", method, rawPath, payloads)
+	// fmt.Printf("inserting payload(s) for: %s %s: %v\n", method, rawPath, payloads)
 
 	return payloads, nil
 }

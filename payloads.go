@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"strings"
 
 	"github.com/pb33f/libopenapi/datamodel/high/base"
@@ -24,7 +23,7 @@ func createFakePayload(schemaProxy *base.SchemaProxy) (interface{}, error) {
 		}
 
 		if err.Error() == "try-rebuild" {
-			log.Printf("Retry %d failed; trying again", i)
+			fmt.Printf("Retry %d failed; trying again", i)
 			continue
 		}
 
@@ -39,7 +38,7 @@ func createFakePayloadFromSchema(schema *base.Schema) (interface{}, error) {
 	// if err != nil {
 	// 	return nil, fmt.Errorf("Couldn't JSON-encode schema %v\n\t%s", schema, err)
 	// }
-	// log.Printf("Processing schema: %s", schemaJson)
+	// fmt.Printf("Processing schema: %s", schemaJson)
 
 	if schema.Default != nil {
 		return schema.Default, nil
@@ -136,7 +135,7 @@ func getPayloadFromType(mediatype string, data interface{}) (string, error) {
 		}
 
 		bytes, err := json.Marshal(data)
-		// log.Printf("marshalled %T value to %s\n", data, bytes)
+		// fmt.Printf("marshalled %T value to %s\n", data, bytes)
 		return string(bytes), err
 	default:
 		return "", fmt.Errorf("Unsupported mediatype %s\n\tAsk us to add it!", mediatype)
