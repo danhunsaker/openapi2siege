@@ -174,12 +174,14 @@ func main() {
 			return err
 		}
 
-		multipleTypes := false
-		if len(urls.MediaTypes()) > 1 {
-			multipleTypes = true
+		types := urls.MediaTypes()
+		multipleTypes := len(types) > 1
+
+		if len(types) < 1 {
+			types = []string{""}
 		}
 
-		for _, mediaType := range urls.MediaTypes() {
+		for _, mediaType := range types {
 			myUrlFile := urlFile
 			myConfigFile := configFile
 
@@ -202,7 +204,11 @@ func main() {
 				return err
 			}
 
-			fmt.Printf("\nConversion complete! To use, run\n\tsiege -R %s -T '%s'\n", myConfigFile, mediaType)
+			if mediaType == "" {
+				fmt.Printf("\nConversion complete! To use, run\n\tsiege -R %s\n", myConfigFile)
+			} else {
+				fmt.Printf("\nConversion complete! To use, run\n\tsiege -R %s -T '%s'\n", myConfigFile, mediaType)
+			}
 		}
 
 		fmt.Println("")
